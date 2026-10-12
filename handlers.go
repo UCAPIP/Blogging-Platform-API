@@ -1,8 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"strconv"
+
+	_ "modernc.org/sqlite"
 )
 
 //func handlerPosts(w http.ResponseWriter, r *http.Request) {
@@ -24,9 +30,27 @@ import (
 //}
 
 func handlerPost(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	targetTask := findTask(id)
+	database, err := sql.Open("sqlite", "store.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer database.Close()
+
+	if err = database.Ping(); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("DB is ready!")
+
+	targetTask, err := findTask(database, id)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	jsonData, _ := json.Marshal(targetTask)
 	w.Header().Set("Content-Type", "application/json")

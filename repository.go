@@ -3,20 +3,18 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
-	"log"
 
 	_ "modernc.org/sqlite"
 )
 
-type Task struct {
-	Id        int    `json:"id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	Category  string `json:"category"`
-	Tags      string `json:"tags"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+type Post struct {
+	Id        int      `json:"id"`
+	Title     string   `json:"title"`
+	Content   string   `json:"content"`
+	Category  string   `json:"category"`
+	Tags      []string `json:"tags"`
+	CreatedAt string   `json:"createdAt"`
+	UpdatedAt string   `json:"updatedAt"`
 }
 
 //func loadTasks() ([]Task, error) {
@@ -32,33 +30,25 @@ type Task struct {
 //	fmt.Println("DB is ready!")
 //}
 
-func findTask(idQ string) string {
+func findTask(db *sql.DB, id int) (*Post, error) {
 
-	database, err := sql.Open("sqlite", "store.db")
+	var p Post
+	var tagsRaw string
+
+	err := db.QueryRow(
+		"SELECT id, title, content, category, tags, created_at, updated_at FROM posts WHERE id = ?",
+		id,
+	).Scan(&p.Id, &p.Title, &p.Content, &p.Category, &tagsRaw, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
-		log.Fatal(err)
-	}
-	defer database.Close()
-
-	if err = database.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("DB is ready!")
-	var article Task
-	stringQuery := "SELECT id, title, content, category, tags, created_at, updated_at FROM posts WHERE id = " + idQ
-	err = database.QueryRow(stringQuery).Scan(&article.Id, &article.Title, &article.Content, &article.Category, &article.Tags, &article.CreatedAt, &article.UpdatedAt)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Println("Задача не найдена")
-		} else {
-			log.Fatal(err)
-		}
+		return nil, err
 	}
 
-	jsonData, err := json.Marshal(article)
-	if err != nil {
-		log.Fatal(err)
+	if err := json.Unmarshal([]byte(tagsRaw), &p.Tags); err != nil {
+		return nil, err
+	}
+	if p.Tags == nil {
+		p.Tags = []string{}
 	}
 
-	return string(jsonData)
+	return &p, nil
 }
