@@ -17,18 +17,31 @@ type Post struct {
 	UpdatedAt string   `json:"updatedAt"`
 }
 
-//func loadTasks() ([]Task, error) {
-//	database, err := sql.Open("sqlite3", "./store.db")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	defer database.Close()
-//
-//	if err = database.Ping(); err != nil {
-//		log.Fatal(err)
-//	}
-//	fmt.Println("DB is ready!")
-//}
+func loadTasks(db *sql.DB) (*[]Post, error) {
+	rows, err := db.Query("SELECT * FROM posts")
+	if err != nil {
+		return nil, err
+	}
+
+	var posts []Post
+	var tagsRaw string
+
+	for rows.Next() {
+		var p Post
+		if err := rows.Scan(&p.Id, &p.Title, &p.Content, &p.Category, &tagsRaw, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(tagsRaw), &p.Tags); err != nil {
+			return nil, err
+		}
+		if p.Tags == nil {
+			p.Tags = []string{}
+		}
+		posts = append(posts, p)
+	}
+	rows.Err()
+	return &posts, nil
+}
 
 func findTask(db *sql.DB, id int) (*Post, error) {
 
