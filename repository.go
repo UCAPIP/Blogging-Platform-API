@@ -68,21 +68,21 @@ func findPost(db *sql.DB, id int) (*Post, error) {
 	return &p, nil
 }
 
-func addPost(db *sql.DB, pi *PostInput) {
+func addPost(db *sql.DB, input *PostInput) {
 
 	now := time.Now().Format(time.RFC3339)
 
-	if pi.Tags == nil {
-		pi.Tags = []string{}
+	if input.Tags == nil {
+		input.Tags = []string{}
 	}
-	tagsJSON, err := json.Marshal(pi.Tags)
+	tagsJSON, err := json.Marshal(input.Tags)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
 	res, err := db.Exec("INSERT INTO posts (title, content, category, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		pi.Title, pi.Content, pi.Category, string(tagsJSON), now, now,
+		input.Title, input.Content, input.Category, string(tagsJSON), now, now,
 	)
 
 	if err != nil {
@@ -96,5 +96,36 @@ func addPost(db *sql.DB, pi *PostInput) {
 		return
 	}
 	log.Println(id, "ID Post was created succesfuly")
+
+}
+
+func editPost(db *sql.DB, input *PostInput, id int) {
+	now := time.Now().Format(time.RFC3339)
+
+	if input.Tags == nil {
+		input.Tags = []string{}
+	}
+	tagsJSON, err := json.Marshal(input.Tags)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	res, err := db.Exec("UPDATE posts SET title = ?, content = ?, category = ?, tags = ?, updated_at = ? WHERE id = ?",
+		input.Title, input.Content, input.Category, string(tagsJSON), now, id,
+	)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if n == 0 {
+		return
+	}
 
 }

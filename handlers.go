@@ -111,6 +111,16 @@ func updatePost(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	fmt.Println("DB is ready!")
+
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	var input PostInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+
+	editPost(database, &input, id)
 }
 
 func deletePost(w http.ResponseWriter, r *http.Request) {
