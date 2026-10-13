@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,25 +10,14 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func listPosts(w http.ResponseWriter, r *http.Request) {
-
-	database, err := sql.Open("sqlite", "store.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer database.Close()
-
-	if err = database.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("DB is ready!")
+func (a *App) listPosts(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path != "/posts" {
 		http.NotFound(w, r)
 		return
 	}
 
-	formattedJson, err := loadPosts(database)
+	formattedJson, err := loadPosts(a.db)
 	if err != nil {
 		log.Printf("ERROR: Unable to load tasks from DB: %v", err)
 		http.Error(w, "Internal server error: Unable to load data", http.StatusInternalServerError)
@@ -41,25 +29,14 @@ func listPosts(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func getPost(w http.ResponseWriter, r *http.Request) {
+func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	database, err := sql.Open("sqlite", "store.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer database.Close()
-
-	if err = database.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("DB is ready!")
-
-	targetTask, err := findPost(database, id)
+	targetTask, err := findPost(a.db, id)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,17 +53,7 @@ type PostInput struct {
 	Tags     []string `json:"tags"`
 }
 
-func createPost(w http.ResponseWriter, r *http.Request) {
-	database, err := sql.Open("sqlite", "store.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer database.Close()
-
-	if err = database.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("DB is ready!")
+func (a *App) createPost(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var input PostInput
@@ -95,43 +62,27 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addPost(database, &input)
+	addPost(a.db, &input)
 
 	log.Printf("%+v", input)
 }
 
-func updatePost(w http.ResponseWriter, r *http.Request) {
-	database, err := sql.Open("sqlite", "store.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer database.Close()
-
-	if err = database.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("DB is ready!")
+func (a *App) updatePost(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	var input PostInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "invalid JSON body", http.StatusBadRequest)
 		return
 	}
 
-	editPost(database, &input, id)
+	editPost(a.db, &input, id)
 }
 
-func deletePost(w http.ResponseWriter, r *http.Request) {
-	database, err := sql.Open("sqlite", "store.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer database.Close()
-
-	if err = database.Ping(); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("DB is ready!")
+func (a *App) deletePost(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("is ready!")
 }
