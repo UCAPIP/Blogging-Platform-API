@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -32,12 +34,19 @@ func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		log.Fatal(err)
+		writeError(w, http.StatusBadRequest, "Bad Request", "The 'id' parameter must be a valid integer number.")
+		return
 	}
 
 	targetTask, err := findPost(a.db, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusBadRequest, "Not Found", "The requested post could not be found.")
+		return
+	}
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		writeError(w, http.StatusBadRequest, "Internal Server Error", "An unexpected error occurred on the server. Please try again later.")
+		return
 	}
 
 	jsonData, _ := json.Marshal(targetTask)
