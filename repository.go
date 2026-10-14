@@ -129,3 +129,19 @@ func editPost(db *sql.DB, input *PostInput, id int) {
 	}
 
 }
+
+func deleting(db *sql.DB, id int) {
+	res, err := db.Exec("DELETE FROM posts WHERE id = ?", id)
+	if err != nil {
+		log.Println(err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if n == 0 {
+		return
+	}
+}

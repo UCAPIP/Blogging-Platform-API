@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -84,5 +83,11 @@ func (a *App) updatePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) deletePost(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("is ready!")
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	deleting(a.db, id)
 }
