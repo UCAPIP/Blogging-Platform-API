@@ -40,12 +40,12 @@ func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
 
 	targetTask, err := findPost(a.db, id)
 	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, http.StatusBadRequest, "Not Found", "The requested post could not be found.")
+		writeError(w, http.StatusNotFound, "Not Found", "The requested post could not be found.")
 		return
 	}
 	if err != nil {
 		log.Println(err)
-		writeError(w, http.StatusBadRequest, "Internal Server Error", "An unexpected error occurred on the server. Please try again later.")
+		writeError(w, http.StatusInternalServerError, "Internal Server Error", "An unexpected error occurred on the server. Please try again later.")
 		return
 	}
 
@@ -66,13 +66,25 @@ func (a *App) createPost(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var input PostInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid JSON body", "")
 		return
 	}
 
-	addPost(a.db, &input)
+	id, err := addPost(a.db, &input)
+	if err != nil {
+		log.Println(err)
+		writeError(w, http.StatusInternalServerError, "Internal Server Error", "An unexpected error occurred on the server. Please try again later.")
+		return
+	}
 
-	log.Printf("%+v", input)
+	post, err := findPost(a.db, int(id))
+	if err != nil {
+		log.Println(err)
+		writeError(w, http.StatusInternalServerError, "internal error", "")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, post)
 }
 
 func (a *App) updatePost(w http.ResponseWriter, r *http.Request) {

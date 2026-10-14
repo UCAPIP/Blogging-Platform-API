@@ -68,7 +68,7 @@ func findPost(db *sql.DB, id int) (*Post, error) {
 	return &p, nil
 }
 
-func addPost(db *sql.DB, input *PostInput) {
+func addPost(db *sql.DB, input *PostInput) (int64, error) {
 
 	now := time.Now().Format(time.RFC3339)
 
@@ -78,7 +78,7 @@ func addPost(db *sql.DB, input *PostInput) {
 	tagsJSON, err := json.Marshal(input.Tags)
 	if err != nil {
 		log.Println(err)
-		return
+		return 0, err
 	}
 
 	res, err := db.Exec("INSERT INTO posts (title, content, category, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -87,15 +87,16 @@ func addPost(db *sql.DB, input *PostInput) {
 
 	if err != nil {
 		log.Println(err)
-		return
+		return 0, err
 	}
 
 	id, err := res.LastInsertId()
 	if err != nil {
 		log.Println(err)
-		return
+		return 0, err
 	}
 	log.Println(id, "ID Post was created succesfuly")
+	return id, nil
 
 }
 
