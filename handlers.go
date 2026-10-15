@@ -7,27 +7,27 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
 
 func (a *App) listPosts(w http.ResponseWriter, r *http.Request) {
 
-	if r.URL.Path != "/posts" {
-		http.NotFound(w, r)
-		return
-	}
-
 	formattedJson, err := loadPosts(a.db)
 	if err != nil {
 		log.Printf("ERROR: Unable to load tasks from DB: %v", err)
-		http.Error(w, "Internal server error: Unable to load data", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Internal server error", "Unable to load data.")
 		return
 	}
 
-	jsonData, _ := json.Marshal(formattedJson)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jsonData)
+	jsonData, err := json.Marshal(formattedJson)
+	if err != nil {
+		log.Println(err)
+		writeError(w, http.StatusInternalServerError, "Internal server error", "")
+		return
+	}
+	writeJSON(w, http.StatusOK, jsonData)
 }
 
 func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
@@ -61,12 +61,31 @@ type PostInput struct {
 	Tags     []string `json:"tags"`
 }
 
+func validate(input *PostInput) []string {
+	var problems []string
+	if strings.TrimSpace(input.Title) == "" {
+		problems = append(problems, "title is required")
+	}
+	if strings.TrimSpace(input.Content) == "" {
+		problems = append(problems, "content is required")
+	}
+	if strings.TrimSpace(input.Category) == "" {
+		problems = append(problems, "category is required")
+	}
+	return problems
+}
+
 func (a *App) createPost(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var input PostInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid JSON body", "")
+		return
+	}
+
+	if problems := validate(&input); len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, "validation failed", strings.Join(problems, "; "))
 		return
 	}
 
@@ -92,23 +111,53 @@ func (a *App) updatePost(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		log.Fatal(err)
-	}
-	var input PostInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Bad Request", "The 'id' parameter must be a valid integer number.")
 		return
 	}
 
-	editPost(a.db, &input, id)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var input PostInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body", "")
+		return
+	}
+
+	if problems := validate(&input); len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, "validation failed", strings.Join(problems, "; "))
+		return
+	}
+
+	err = editPost(a.db, &input, id)
+	if err != nil {
+		log.Println(err)
+		writeError(w, http.StatusInternalServerError, "internal error", "")
+		return
+	}
+
+	post, err := findPost(a.db, id)
+	if err != nil {
+		log.Println(err)
+		writeError(w, http.StatusInternalServerError, "internal error", "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, post)
 }
 
 func (a *App) deletePost(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		log.Fatal(err)
+		writeError(w, http.StatusBadRequest, "Bad Request", "The 'id' parameter must be a valid integer number.")
+		return
 	}
 
-	deleting(a.db, id)
+	err = deleting(a.db, id)
+	if err != nil {
+		log.Println(err)
+		writeError(w, http.StatusInternalServerError, "internal error", "")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

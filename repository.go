@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log"
 	"time"
 
@@ -19,34 +20,41 @@ type Post struct {
 	UpdatedAt string   `json:"updatedAt"`
 }
 
-func loadPosts(db *sql.DB) (*[]Post, error) {
+func loadPosts(db *sql.DB) ([]Post, error) {
+
+	posts := []Post{}
+
 	rows, err := db.Query("SELECT * FROM posts")
 	if err != nil {
-		return nil, err
+		return posts, err
 	}
-
-	var posts []Post
-	var tagsRaw string
 
 	for rows.Next() {
 		var p Post
+		var tagsRaw string
 		if err := rows.Scan(&p.Id, &p.Title, &p.Content, &p.Category, &tagsRaw, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, err
+			return posts, err
 		}
 		if err := json.Unmarshal([]byte(tagsRaw), &p.Tags); err != nil {
-			return nil, err
+			return posts, err
 		}
 		if p.Tags == nil {
 			p.Tags = []string{}
 		}
 		posts = append(posts, p)
 	}
+
 	rows.Err()
-	return &posts, nil
+	if err := rows.Err(); err != nil {
+		return posts, err
+	}
+	defer rows.Close()
+
+	return posts, nil
 }
 
 func findPost(db *sql.DB, id int) (*Post, error) {
-
+	var ErrNotFound = errors.New("post not found")
 	var p Post
 	var tagsRaw string
 
@@ -54,13 +62,14 @@ func findPost(db *sql.DB, id int) (*Post, error) {
 		"SELECT id, title, content, category, tags, created_at, updated_at FROM posts WHERE id = ?",
 		id,
 	).Scan(&p.Id, &p.Title, &p.Content, &p.Category, &tagsRaw, &p.CreatedAt, &p.UpdatedAt)
-	if err != nil {
-		return nil, err
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
 	}
 
 	if err := json.Unmarshal([]byte(tagsRaw), &p.Tags); err != nil {
 		return nil, err
 	}
+
 	if p.Tags == nil {
 		p.Tags = []string{}
 	}
@@ -100,7 +109,8 @@ func addPost(db *sql.DB, input *PostInput) (int64, error) {
 
 }
 
-func editPost(db *sql.DB, input *PostInput, id int) {
+func editPost(db *sql.DB, input *PostInput, id int) error {
+	var ErrNotFound = errors.New("post not found")
 	now := time.Now().Format(time.RFC3339)
 
 	if input.Tags == nil {
@@ -108,41 +118,39 @@ func editPost(db *sql.DB, input *PostInput, id int) {
 	}
 	tagsJSON, err := json.Marshal(input.Tags)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 
 	res, err := db.Exec("UPDATE posts SET title = ?, content = ?, category = ?, tags = ?, updated_at = ? WHERE id = ?",
 		input.Title, input.Content, input.Category, string(tagsJSON), now, id,
 	)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	if n == 0 {
-		return
+		return ErrNotFound
 	}
-
+	return nil
 }
 
-func deleting(db *sql.DB, id int) {
+func deleting(db *sql.DB, id int) error {
+	var ErrNotFound = errors.New("post not found")
 	res, err := db.Exec("DELETE FROM posts WHERE id = ?", id)
 	if err != nil {
-		log.Println(err)
+		return err
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	if n == 0 {
-		return
+		return ErrNotFound
 	}
+	return nil
 }
