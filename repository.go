@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -20,13 +21,29 @@ type Post struct {
 
 var ErrNotFound = errors.New("post not found")
 
-func loadPosts(db *sql.DB) ([]Post, error) {
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+func loading(db *sql.DB, term string) ([]Post, error) {
 
 	posts := []Post{}
 
-	rows, err := db.Query("SELECT id, title, content, category, tags, created_at, updated_at FROM posts")
+	query := "SELECT id, title, content, category, tags, created_at, updated_at FROM posts"
+	var args []any
+
+	if term != "" {
+		query += ` WHERE title LIKE ? ESCAPE '\'
+		              OR content LIKE ? ESCAPE '\'
+		              OR category LIKE ? ESCAPE '\'`
+		pattern := "%" + escapeLike(term) + "%"
+		args = append(args, pattern, pattern, pattern)
+	}
+	query += " ORDER BY id"
+
+	rows, err := db.Query(query, args...)
 	if err != nil {
-		return posts, err
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -52,7 +69,7 @@ func loadPosts(db *sql.DB) ([]Post, error) {
 	return posts, nil
 }
 
-func findPost(db *sql.DB, id int) (*Post, error) {
+func finding(db *sql.DB, id int) (*Post, error) {
 	var p Post
 	var tagsRaw string
 
@@ -78,7 +95,7 @@ func findPost(db *sql.DB, id int) (*Post, error) {
 	return &p, nil
 }
 
-func addPost(db *sql.DB, input *PostInput) (int64, error) {
+func adding(db *sql.DB, input *PostInput) (int64, error) {
 
 	now := time.Now().Format(time.RFC3339)
 
@@ -110,7 +127,7 @@ func addPost(db *sql.DB, input *PostInput) (int64, error) {
 
 }
 
-func editPost(db *sql.DB, input *PostInput, id int) error {
+func editing(db *sql.DB, input *PostInput, id int) error {
 	now := time.Now().Format(time.RFC3339)
 
 	if input.Tags == nil {

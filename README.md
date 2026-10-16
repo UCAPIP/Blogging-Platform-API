@@ -170,7 +170,7 @@ Invoke-RestMethod http://localhost:8080/posts
 
 ### Roadmap
 
-- [ ] Search by term: `GET /posts?term=tech` (wildcard search in title, content and category)
+- [x] Search by term: `GET /posts?term=tech` (wildcard search in title, content and category)
 - [ ] Create the table automatically on startup
 - [ ] Automated tests (`net/http/httptest`)
 - [ ] Configuration through environment variables (port, database path)
@@ -344,7 +344,7 @@ Invoke-RestMethod http://localhost:8080/posts
 
 ### Планы
 
-- [ ] Поиск по слову: `GET /posts?term=tech` (поиск по подстроке в title, content и category)
+- [x] Поиск по слову: `GET /posts?term=tech` (поиск по подстроке в title, content и category)
 - [ ] Автоматическое создание таблицы при старте
 - [ ] Автотесты (`net/http/httptest`)
 - [ ] Настройка через переменные окружения (порт, путь к базе)

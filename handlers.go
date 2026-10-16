@@ -9,40 +9,6 @@ import (
 	"strings"
 )
 
-func (a *App) listPosts(w http.ResponseWriter, r *http.Request) {
-
-	formattedJson, err := loadPosts(a.db)
-	if err != nil {
-		log.Printf("ERROR: Unable to load tasks from DB: %v", err)
-		writeError(w, http.StatusInternalServerError, "Internal server error", "Unable to load data.")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, formattedJson)
-}
-
-func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "Bad Request", "The 'id' parameter must be a valid integer number.")
-		return
-	}
-
-	targetTask, err := findPost(a.db, id)
-	if errors.Is(err, ErrNotFound) {
-		writeError(w, http.StatusNotFound, "post not found", "")
-		return
-	}
-	if err != nil {
-		log.Println(err)
-		writeError(w, http.StatusInternalServerError, "Internal Server Error", "An unexpected error occurred on the server. Please try again later.")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, targetTask)
-}
-
 type PostInput struct {
 	Title    string   `json:"title"`
 	Content  string   `json:"content"`
@@ -64,6 +30,42 @@ func validate(input *PostInput) []string {
 	return problems
 }
 
+func (a *App) listPosts(w http.ResponseWriter, r *http.Request) {
+
+	term := strings.TrimSpace(r.URL.Query().Get("term"))
+
+	posts, err := loading(a.db, term)
+	if err != nil {
+		log.Printf("ERROR: Unable to load tasks from DB: %v", err)
+		writeError(w, http.StatusInternalServerError, "Internal server error", "Unable to load data.")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, posts)
+}
+
+func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Bad Request", "The 'id' parameter must be a valid integer number.")
+		return
+	}
+
+	targetTask, err := finding(a.db, id)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "post not found", "")
+		return
+	}
+	if err != nil {
+		log.Println(err)
+		writeError(w, http.StatusInternalServerError, "Internal Server Error", "An unexpected error occurred on the server. Please try again later.")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, targetTask)
+}
+
 func (a *App) createPost(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -78,14 +80,14 @@ func (a *App) createPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := addPost(a.db, &input)
+	id, err := adding(a.db, &input)
 	if err != nil {
 		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "Internal Server Error", "An unexpected error occurred on the server. Please try again later.")
 		return
 	}
 
-	post, err := findPost(a.db, int(id))
+	post, err := finding(a.db, int(id))
 	if err != nil {
 		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "internal error", "")
@@ -116,7 +118,7 @@ func (a *App) updatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = editPost(a.db, &input, id)
+	err = editing(a.db, &input, id)
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, http.StatusNotFound, "post not found", "")
 		return
@@ -127,7 +129,7 @@ func (a *App) updatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := findPost(a.db, id)
+	post, err := finding(a.db, id)
 	if err != nil {
 		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "internal error", "")
