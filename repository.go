@@ -6,8 +6,6 @@ import (
 	"errors"
 	"log"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
 type Post struct {
