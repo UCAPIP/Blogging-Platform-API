@@ -1,15 +1,12 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
-
-	_ "modernc.org/sqlite"
 )
 
 func (a *App) listPosts(w http.ResponseWriter, r *http.Request) {
@@ -21,13 +18,7 @@ func (a *App) listPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonData, err := json.Marshal(formattedJson)
-	if err != nil {
-		log.Println(err)
-		writeError(w, http.StatusInternalServerError, "Internal server error", "")
-		return
-	}
-	writeJSON(w, http.StatusOK, jsonData)
+	writeJSON(w, http.StatusOK, formattedJson)
 }
 
 func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
@@ -39,8 +30,8 @@ func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	targetTask, err := findPost(a.db, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, http.StatusNotFound, "Not Found", "The requested post could not be found.")
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "post not found", "")
 		return
 	}
 	if err != nil {
@@ -49,9 +40,7 @@ func (a *App) getPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonData, _ := json.Marshal(targetTask)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jsonData)
+	writeJSON(w, http.StatusOK, targetTask)
 }
 
 type PostInput struct {
@@ -128,6 +117,10 @@ func (a *App) updatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = editPost(a.db, &input, id)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "post not found", "")
+		return
+	}
 	if err != nil {
 		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "internal error", "")
@@ -153,6 +146,10 @@ func (a *App) deletePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = deleting(a.db, id)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "post not found", "")
+		return
+	}
 	if err != nil {
 		log.Println(err)
 		writeError(w, http.StatusInternalServerError, "internal error", "")

@@ -20,14 +20,17 @@ type Post struct {
 	UpdatedAt string   `json:"updatedAt"`
 }
 
+var ErrNotFound = errors.New("post not found")
+
 func loadPosts(db *sql.DB) ([]Post, error) {
 
 	posts := []Post{}
 
-	rows, err := db.Query("SELECT * FROM posts")
+	rows, err := db.Query("SELECT id, title, content, category, tags, created_at, updated_at FROM posts")
 	if err != nil {
 		return posts, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var p Post
@@ -44,17 +47,14 @@ func loadPosts(db *sql.DB) ([]Post, error) {
 		posts = append(posts, p)
 	}
 
-	rows.Err()
 	if err := rows.Err(); err != nil {
 		return posts, err
 	}
-	defer rows.Close()
 
 	return posts, nil
 }
 
 func findPost(db *sql.DB, id int) (*Post, error) {
-	var ErrNotFound = errors.New("post not found")
 	var p Post
 	var tagsRaw string
 
@@ -64,6 +64,9 @@ func findPost(db *sql.DB, id int) (*Post, error) {
 	).Scan(&p.Id, &p.Title, &p.Content, &p.Category, &tagsRaw, &p.CreatedAt, &p.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	if err := json.Unmarshal([]byte(tagsRaw), &p.Tags); err != nil {
@@ -110,7 +113,6 @@ func addPost(db *sql.DB, input *PostInput) (int64, error) {
 }
 
 func editPost(db *sql.DB, input *PostInput, id int) error {
-	var ErrNotFound = errors.New("post not found")
 	now := time.Now().Format(time.RFC3339)
 
 	if input.Tags == nil {
@@ -139,7 +141,6 @@ func editPost(db *sql.DB, input *PostInput, id int) error {
 }
 
 func deleting(db *sql.DB, id int) error {
-	var ErrNotFound = errors.New("post not found")
 	res, err := db.Exec("DELETE FROM posts WHERE id = ?", id)
 	if err != nil {
 		return err
